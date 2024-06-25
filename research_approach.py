@@ -46,7 +46,7 @@ def display_solution(strip, rectangles, pos_circuits):
     plt.show()
 
 #read file input
-input = read_file_instance(30)
+input = read_file_instance(40)
 width = int(input[0])
 n_rec = int(input[1])
 rectangles =  [[int(val) for val in i.split()] for i in input[-n_rec:]]
@@ -76,88 +76,69 @@ def OPP(strip):
             variables[f"py{i + 1},{f}"] = counter  # pyi,f
             counter += 1
 
-    # print the variables
-    #print(variables)
-
-    for o in range(lower_bound, upper_bound):
-        variables[f"ph{o}"] = counter
-        counter += 1
-
-    for o in range(lower_bound, upper_bound - 1):
-        cnf.append([-variables[f"ph{o}"], variables[f"ph{o + 1}"]])
-        for i in range(len(rectangles)):
-            if f"py{i},{o - rectangles[i][1]}" in variables:
-                cnf.append([-variables[f"ph{o}"], variables[f"py{i},{o - rectangles[i][1]}"]])
-
     # Add the 2-literal axiom clauses
     for i in range(len(rectangles)):
         for e in range(strip[0] - rectangles[i][0] + 1):  # -1 because we're using e+1 in the clause
-            cnf.append([-variables[f"px{i + 1},{e}"], variables[f"px{i + 1},{e + 1}"]])
+            cnf.append([-variables[f"px{i + 1},{e}"],
+                        variables[f"px{i + 1},{e + 1}"]])
         for f in range(strip[1] - rectangles[i][1] + 1):  # -1 because we're using f+1 in the clause
-            cnf.append([-variables[f"py{i + 1},{f}"], variables[f"py{i + 1},{f + 1}"]])
+            cnf.append([-variables[f"py{i + 1},{f}"],
+                        variables[f"py{i + 1},{f + 1}"]])
 
     # Add the 4-literal axiom clauses
     for i in range(len(rectangles)):
         for j in range(i + 1, len(rectangles)):
-            cnf.append([variables[f"lr{i + 1},{j + 1}"], variables[f"lr{j + 1},{i + 1}"], variables[f"ud{i + 1},{j + 1}"],
+            cnf.append([variables[f"lr{i + 1},{j + 1}"],
+                        variables[f"lr{j + 1},{i + 1}"],
+                        variables[f"ud{i + 1},{j + 1}"],
                         variables[f"ud{j + 1},{i + 1}"]])
 
     # Add the 3-literal non-overlapping constraints
     for i in range(len(rectangles)):
         for j in range(i + 1, len(rectangles)):
+            for e in range(rectangles[i][0]):
+                if f"px{j + 1},{e}" in variables:
+                    cnf.append([-variables[f"lr{i + 1},{j + 1}"],
+                                -variables[f"px{j + 1},{e}"]])
+            for e in range(rectangles[j][0]):
+                if f"px{i + 1},{e}" in variables:
+                    cnf.append([-variables[f"lr{j + 1},{i + 1}"],
+                                -variables[f"px{i + 1},{e}"]])
+
+            for f in range(rectangles[i][1]):
+                if f"py{j + 1},{f}" in variables:
+                    cnf.append([-variables[f"ud{i + 1},{j + 1}"],
+                                -variables[f"py{j + 1},{f}"]])
+            for f in range(rectangles[j][1]):
+                if f"py{i + 1},{f}" in variables:
+                    cnf.append([-variables[f"ud{j + 1},{i + 1}"],
+                                -variables[f"py{i + 1},{f}"]])
+
             for e in positive_range(strip[0] - rectangles[i][0]) :
-
                 if f"px{j + 1},{e + rectangles[i][0]}" in variables:
-                    cnf.append([-variables[f"lr{i + 1},{j + 1}"], variables[f"px{i + 1},{e}"],
-                                -variables.get(f"px{j + 1},{e + rectangles[i][0]}", 0)])
+                    cnf.append([-variables[f"lr{i + 1},{j + 1}"],
+                                variables[f"px{i + 1},{e}"],
+                                -variables[f"px{j + 1},{e + rectangles[i][0]}"]])
                 if f"px{i + 1},{e + rectangles[j][0]}" in variables:
-                    cnf.append([-variables[f"lr{j + 1},{i + 1}"], variables.get(f"px{j + 1},{e}", 0),
-                                -variables.get(f"px{i + 1},{e + rectangles[j][0]}", 0)])
+                    cnf.append([-variables[f"lr{j + 1},{i + 1}"],
+                                variables[f"px{j + 1},{e}"],
+                                -variables[f"px{i + 1},{e + rectangles[j][0]}"]])
+
             for f in positive_range(strip[1] - rectangles[i][1]):
-
                 if f"py{j + 1},{f + rectangles[i][1]}" in variables:
-                    cnf.append([-variables[f"ud{i + 1},{j + 1}"], variables[f"py{i + 1},{f}"],
-                            -variables.get(f"py{j + 1},{f + rectangles[i][1]}", 0)])
-
+                    cnf.append([-variables[f"ud{i + 1},{j + 1}"],
+                                variables[f"py{i + 1},{f}"],
+                                -variables[f"py{j + 1},{f + rectangles[i][1]}"]])
                 if f"py{i + 1},{f + rectangles[j][1]}" in variables:
-                    cnf.append([-variables[f"ud{j + 1},{i + 1}"], variables.get(f"py{j + 1},{f}", 0),
-                                -variables.get(f"py{i + 1},{f + rectangles[j][1]}", 0)])
+                    cnf.append([-variables[f"ud{j + 1},{i + 1}"],
+                                variables[f"py{j + 1},{f}"],
+                                -variables[f"py{i + 1},{f + rectangles[j][1]}"]])
 
     # Domain encoding for px and py: 0 <= x <= strip[0] and 0 <= y <= strip[1]
     # equal to: px(i, W-wi) ^ !px(i,-1) and py(i, H-hi) ^ !py(i,-1)
-
     for i in range(len(rectangles)):
         cnf.append([variables[f"px{i + 1},{strip[0] - rectangles[i][0]}"]])  # px(i, W-wi)
         cnf.append([variables[f"py{i + 1},{strip[1] - rectangles[i][1]}"]])  # py(i, H-hi)
-
-    for i in range(len(rectangles)):
-        for j in range(i + 1, len(rectangles)):
-            # if indomain(len(px[j]) - 1, width_rects[i] - 1)
-            if strip[0] - rectangles[i][0] + 1 >= rectangles[j][0] - 1:
-                cnf.append([-variables[f"lr{i + 1},{j + 1}"], -variables[f"px{j + 1},{rectangles[i][0] - 1}"]])
-            else:
-                cnf.append([-variables[f"lr{i + 1},{j + 1}"], variables[f"px{j + 1},{strip[0] - rectangles[i][0] + 1}"]])
-            # if indomain(len(px[i] - 1, width_rects[j] - 1)
-            if strip[0] - rectangles[j][0] + 1 >= rectangles[i][0] - 1:
-                cnf.append([-variables[f"lr{j + 1},{i + 1}"], -variables[f"px{i + 1},{rectangles[j][0] - 1}"]])
-            else:
-                cnf.append([-variables[f"lr{j + 1},{i + 1}"], variables[f"px{i + 1},{strip[0] - rectangles[j][0] + 1}"]])
-            # if indomain(len(py[j]) - 1, height_rects[i] - 1)
-            if strip[1] - rectangles[i][1] + 1 >= rectangles[j][1] - 1:
-                cnf.append([-variables[f"ud{i + 1},{j + 1}"], -variables[f"py{j + 1},{rectangles[i][1] - 1}"]])
-            else:
-                if f"py{j + 1},{strip[1] - rectangles[i][1] + 1}" in variables:
-                    cnf.append([-variables[f"ud{i + 1},{j + 1}"], variables[f"py{j + 1},{strip[1] - rectangles[i][1] + 1}"]])
-            # if indomain(len(py[i]) - 1, height_rects[j] - 1)
-            if strip[1] - rectangles[j][1] + 1 >= rectangles[i][1] - 1:
-                cnf.append([-variables[f"ud{j + 1},{i + 1}"], -variables[f"py{i + 1},{rectangles[j][1] - 1}"]])
-            else:
-                if f"py{i + 1},{strip[1] - rectangles[j][1] + 1}" in variables:
-                    cnf.append([-variables[f"ud{j + 1},{i + 1}"], variables[f"py{i + 1},{strip[1] - rectangles[j][1] + 1}"]])
-
-    #print(cnf)
-    #remove invalid cnf clause
-
 
 
     with Solver(name="mc") as solver:
@@ -201,7 +182,7 @@ def OPP(strip):
 heights = [int(rectangle[1]) for rectangle in rectangles]
 area = math.floor(sum([int(rectangle[0] * rectangle[1]) for rectangle in rectangles]) / width)
 upper_bound = sum(heights)
-lower_bound = max(heights)
+lower_bound = max(area, max(heights))
 print(rectangles)
 print(sum([int(rectangle[0] * rectangle[1]) for rectangle in rectangles]))
 optimal_height = 0
@@ -237,5 +218,3 @@ display_solution((width, optimal_height), rectangles, optimal_pos)
 
 stop = timeit.default_timer()
 print('Time: ', stop - start)
-
-
