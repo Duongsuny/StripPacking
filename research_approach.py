@@ -179,6 +179,7 @@ def OPP(strip):
 
     # Domain encoding for px and py: 0 <= x <= strip[0] and 0 <= y <= strip[1]
     # equal to: px(i, W-wi) ^ !px(i,-1) and py(i, H-hi) ^ !py(i,-1)
+
     for i in range(len(rectangles)):
         cnf.append([variables[f"px{i + 1},{strip[0] - rectangles[i][0]}"]])  # px(i, W-wi)
         cnf.append([variables[f"py{i + 1},{strip[1] - rectangles[i][1]}"]])  # py(i, H-hi)
