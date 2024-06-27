@@ -46,7 +46,7 @@ def display_solution(strip, rectangles, pos_circuits, rotation):
     plt.show()
 
 #read file input
-input = read_file_instance(10)
+input = read_file_instance(42)
 width = int(input[0])
 n_rec = int(input[1])
 rectangles =  [[int(val) for val in i.split()] for i in input[-n_rec:]]
@@ -181,35 +181,39 @@ def OPP(strip):
 
     for i in range(len(rectangles)):
         for j in range(i + 1, len(rectangles)):
-            # lri,j ∨ lrj,i ∨ udi,j ∨ udj,i
-            #Large-rectangles horizontal
-            if rectangles[i][0] + rectangles[j][0] > width:
-                non_overlapping(False, i, j, False, False, True, True)
-                non_overlapping(True, i, j, False, False, True, True)
+           # #  #Large-rectangles horizontal
+           #  if rectangles[i][0] + rectangles[j][0] > width:
+           #      non_overlapping(False, i, j, False, False, True, True)
+           # # #  #Large-rectangles vertical
+           #  elif rectangles[i][1] + rectangles[j][1] > height:
+           #      non_overlapping(False, i, j, True, True, False, False)
+           #
+           #  #Same-sized rectangles
+           #  elif rectangles[i] == rectangles[j]:
+           #      non_overlapping(False, i, j, True, False, True, True)
+           #  #
+           #  #largest width rectangle
+           #  elif rectangles[i][0] == max_width and rectangles[j][0] > (width - max_width) / 2:
+           #      non_overlapping(False, i, j, False, True, True, True)
+           #  #
+           #  #largest height rectangle
+           #  elif rectangles[i][1] == max_height and rectangles[j][1] > (height - max_height) / 2:
+           #      non_overlapping(False, i, j, True, True, False, True)
+           # # #normal rectangles
+           # else:
+            non_overlapping(False, i, j, True, True, True, True)
+            non_overlapping(True, i, j, True, True, True, True)
 
-            #Large-rectangles vertical
-            if rectangles[i][1] + rectangles[j][1] > height:
-                non_overlapping(False, i, j, True, True, False, False)
-                non_overlapping(True, i, j, True, True, False, False)
+            #Rotation
+                # Large-rectangles horizontal
+            # if rectangles[i][1] + rectangles[j][0] > width or rectangles[i][0] + rectangles[j][1] > width:
+            #     non_overlapping(True, i, j, False, False, True, True)
+            #     #  #Large-rectangles vertical
+            # elif rectangles[i][1] + rectangles[j][0] > height or rectangles[i][0] + rectangles[j][1] > height:
+            #     non_overlapping(True, i, j, True, True, False, False)
+            # else:
+            #     non_overlapping(True, i, j, True, True, True, True)
 
-            #Same-sized rectangles
-            elif rectangles[i] == rectangles[j]:
-                non_overlapping(False, i, j, True, False, True, True)
-                non_overlapping(True, i, j, True, False, True, True)
-            #
-            #largest width rectangle
-            elif rectangles[i][0] == max_width and rectangles[j][0] > (width - max_width) / 2:
-                non_overlapping(False, i, j, False, True, True, True)
-                non_overlapping(True, i, j, False, True, True, True)
-            #
-            #largest height rectangle
-            elif rectangles[i][1] == max_height and rectangles[j][1] > (height - max_height) / 2:
-                non_overlapping(False, i, j, True, True, False, True)
-                non_overlapping(True, i, j, True, True, False, True)
-           #normal rectangles
-            else:
-                non_overlapping(False, i, j, True, True, True, True)
-                non_overlapping(True, i, j, True, True, True, True)
 
 
 
