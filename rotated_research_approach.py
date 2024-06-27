@@ -46,7 +46,7 @@ def display_solution(strip, rectangles, pos_circuits, rotation):
     plt.show()
 
 #read file input
-input = read_file_instance(2)
+input = read_file_instance(10)
 width = int(input[0])
 n_rec = int(input[1])
 rectangles =  [[int(val) for val in i.split()] for i in input[-n_rec:]]
@@ -61,6 +61,7 @@ def positive_range(end):
 
 def OPP(strip):
 # Define the variables
+    height = int(strip[1])
     cnf = CNF()
     variables = {}
     counter = 1
@@ -69,35 +70,52 @@ def OPP(strip):
 
     for i in range(len(rectangles)):
         for j in range(len(rectangles)):
-            variables[f"lr{i + 1},{j + 1}"] = counter  # lri,rj
-            counter += 1
-            variables[f"ud{i + 1},{j + 1}"] = counter  # uri,rj
-            counter += 1
-        for e in positive_range(strip[0] - rectangles[i][0] + 2):
+            if i != j:
+                variables[f"lr{i + 1},{j + 1}"] = counter  # lri,rj
+                counter += 1
+                variables[f"ud{i + 1},{j + 1}"] = counter  # uri,rj
+                counter += 1
+        for e in range(width):
             variables[f"px{i + 1},{e}"] = counter  # pxi,e
             counter += 1
-        for f in positive_range(strip[1] - rectangles[i][1] + 2):
+        for f in range(height):
             variables[f"py{i + 1},{f}"] = counter  # pyi,f
             counter += 1
 
     # Rotated variables
     for i in range(len(rectangles)):
         variables[f"r{i + 1}"] = counter
-        cnf.append([variables[f"r{i + 1}"]])
+        #cnf.append([variables[f"r{i + 1}"]])
         counter += 1
 
     # Add the 2-literal axiom clauses
     for i in range(len(rectangles)):
-        for e in range(strip[0] - rectangles[i][0] + 1):  # -1 because we're using e+1 in the clause
+        for e in range(width - 1):  # -1 because we're using e+1 in the clause
             cnf.append([-variables[f"px{i + 1},{e}"],
                         variables[f"px{i + 1},{e + 1}"]])
-        for f in range(strip[1] - rectangles[i][1] + 1):  # -1 because we're using f+1 in the clause
+        for f in range(height - 1):  # -1 because we're using f+1 in the clause
             cnf.append([-variables[f"py{i + 1},{f}"],
                         variables[f"py{i + 1},{f + 1}"]])
 
 
     # Add the 3-literal non-overlapping constraints
-    def non_overlapping(i, j, h1, h2, v1, v2):
+
+    def non_overlapping(rotated, i, j, h1, h2, v1, v2):
+        if not rotated:
+            i_width = rectangles[i][0]
+            i_height = rectangles[i][1]
+            j_width = rectangles[j][0]
+            j_height = rectangles[j][1]
+            i_rotation = variables[f"r{i + 1}"]
+            j_rotation = variables[f"r{j + 1}"]
+        else:
+            i_width = rectangles[i][1]
+            i_height = rectangles[i][0]
+            j_width = rectangles[j][1]
+            j_height = rectangles[j][0]
+            i_rotation = -variables[f"r{i + 1}"]
+            j_rotation = -variables[f"r{j + 1}"]
+
         four_literal = []
         if h1: four_literal.append(variables[f"lr{i + 1},{j + 1}"])
         if h2: four_literal.append(variables[f"lr{j + 1},{i + 1}"])
@@ -107,179 +125,124 @@ def OPP(strip):
 
         # ¬lri, j ∨ ¬pxj, e
         if h1:
-            for e in range(rectangles[i][0]):
-                if f"px{j + 1},{e}" in variables:
-                    cnf.append([variables[f"r{i + 1}"],
-                                -variables[f"lr{i + 1},{j + 1}"],
-                                -variables[f"px{j + 1},{e}"]])
-        # Rotated
-        if h1:
-            for e in range(rectangles[i][1]):
-                if f"px{j + 1},{e}" in variables:
-                    cnf.append([-variables[f"r{i + 1}"],
+            for e in range(min(width, i_width)):
+                    cnf.append([i_rotation,
                                 -variables[f"lr{i + 1},{j + 1}"],
                                 -variables[f"px{j + 1},{e}"]])
         # ¬lrj,i ∨ ¬pxi,e
         if h2:
-            for e in range(rectangles[j][0]):
-                if f"px{i + 1},{e}" in variables:
-                    cnf.append([variables[f"r{j + 1}"],
-                                -variables[f"lr{j + 1},{i + 1}"],
-                                -variables[f"px{i + 1},{e}"]])
-        # Rotated
-        if h2:
-            for e in range(rectangles[j][1]):
-                if f"px{i + 1},{e}" in variables:
-                    cnf.append([-variables[f"r{j + 1}"],
+            for e in range(min(width, j_width)):
+                    cnf.append([j_rotation,
                                 -variables[f"lr{j + 1},{i + 1}"],
                                 -variables[f"px{i + 1},{e}"]])
         # ¬udi,j ∨ ¬pyj,f
         if v1:
-            for f in range(rectangles[i][1]):
-                if f"py{j + 1},{f}" in variables:
-                    cnf.append([variables[f"r{i + 1}"],
-                                -variables[f"ud{i + 1},{j + 1}"],
-                                -variables[f"py{j + 1},{f}"]])
-        # Rotated
-        if v1:
-            for f in range(rectangles[i][0]):
-                if f"py{j + 1},{f}" in variables:
-                    cnf.append([-variables[f"r{i + 1}"],
+            for f in range(min(height, i_height)):
+                    cnf.append([i_rotation,
                                 -variables[f"ud{i + 1},{j + 1}"],
                                 -variables[f"py{j + 1},{f}"]])
         # ¬udj, i ∨ ¬pyi, f,
         if v2:
-            for f in range(rectangles[j][1]):
-                if f"py{i + 1},{f}" in variables:
-                    cnf.append([variables[f"r{j + 1}"],
-                                -variables[f"ud{j + 1},{i + 1}"],
-                                -variables[f"py{i + 1},{f}"]])
-        # Rotated
-        if v2:
-            for f in range(rectangles[j][0]):
-                if f"py{i + 1},{f}" in variables:
-                    cnf.append([-variables[f"r{j + 1}"],
+            for f in range(min(height, j_height)):
+                    cnf.append([j_rotation,
                                 -variables[f"ud{j + 1},{i + 1}"],
                                 -variables[f"py{i + 1},{f}"]])
 
-        for e in positive_range(strip[0] - rectangles[i][0]):
+        for e in positive_range(width - i_width):
             # ¬lri,j ∨ ¬pxj,e+wi ∨ pxi,e
             if h1:
-                if f"px{j + 1},{e + rectangles[i][0]}" in variables:
-                    cnf.append([variables[f"r{i + 1}"],
+                    cnf.append([i_rotation,
                                 -variables[f"lr{i + 1},{j + 1}"],
                                 variables[f"px{i + 1},{e}"],
-                                -variables[f"px{j + 1},{e + rectangles[i][0]}"]])
-            # ¬lrj,i ∨ ¬pxi,e+wj ∨ pxj,e
-            if h2:
-                if f"px{i + 1},{e + rectangles[j][0]}" in variables:
-                    cnf.append([variables[f"r{j + 1}"],
-                                -variables[f"lr{j + 1},{i + 1}"],
-                                variables[f"px{j + 1},{e}"],
-                                -variables[f"px{i + 1},{e + rectangles[j][0]}"]])
-        # Rotated
-        for e in positive_range(strip[0] - rectangles[i][1]):
-            # ¬lri,j ∨ ¬pxj,e+wi ∨ pxi,e
-            if h1:
-                if f"px{j + 1},{e + rectangles[i][1]}" in variables and f"px{i + 1},{e}" in variables:
-                    cnf.append([-variables[f"r{i + 1}"],
-                                -variables[f"lr{i + 1},{j + 1}"],
-                                variables[f"px{i + 1},{e}"],
-                                -variables[f"px{j + 1},{e + rectangles[i][1]}"]])
-        #for e in positive_range(strip[0] - rectangles[j][1]):
-            # ¬lrj,i ∨ ¬pxi,e+wj ∨ pxj,e
-            if h2:
-                if f"px{i + 1},{e + rectangles[j][1]}" in variables and f"px{j + 1},{e}" in variables:
-                    cnf.append([-variables[f"r{j + 1}"],
-                                -variables[f"lr{j + 1},{i + 1}"],
-                                variables[f"px{j + 1},{e}"],
-                                -variables[f"px{i + 1},{e + rectangles[j][1]}"]])
+                                -variables[f"px{j + 1},{e + i_width}"]])
 
-        for f in positive_range(strip[1] - rectangles[i][1]):
+        for e in positive_range(width - j_width):
+            # ¬lrj,i ∨ ¬pxi,e+wj ∨ pxj,e
+            if h2:
+                    cnf.append([j_rotation,
+                                -variables[f"lr{j + 1},{i + 1}"],
+                                variables[f"px{j + 1},{e}"],
+                                -variables[f"px{i + 1},{e + j_width}"]])
+
+        for f in positive_range(height - i_height):
             # udi,j ∨ ¬pyj,f+hi ∨ pxi,e
             if v1:
-                if f"py{j + 1},{f + rectangles[i][1]}" in variables:
-                    cnf.append([variables[f"r{i + 1}"],
+                    cnf.append([i_rotation,
                                 -variables[f"ud{i + 1},{j + 1}"],
                                 variables[f"py{i + 1},{f}"],
-                                -variables[f"py{j + 1},{f + rectangles[i][1]}"]])
+                                -variables[f"py{j + 1},{f + i_height}"]])
+        for f in positive_range(height - j_height):
             # ¬udj,i ∨ ¬pyi,f+hj ∨ pxj,f
             if v2:
-                if f"py{i + 1},{f + rectangles[j][1]}" in variables:
-                    cnf.append([variables[f"r{j + 1}"],
+                    cnf.append([j_rotation,
                                 -variables[f"ud{j + 1},{i + 1}"],
                                 variables[f"py{j + 1},{f}"],
-                                -variables[f"py{i + 1},{f + rectangles[j][1]}"]])
-        # Rotated
-        for f in positive_range(strip[1] - rectangles[i][0]):
-            # udi,j ∨ ¬pyj,f+hi ∨ pxi,e
-            if v1:
-                if f"py{j + 1},{f + rectangles[i][0]}" in variables and f"py{i + 1},{f}" in variables:
-                    cnf.append([-variables[f"r{i + 1}"],
-                                -variables[f"ud{i + 1},{j + 1}"],
-                                variables[f"py{i + 1},{f}"],
-                                -variables[f"py{j + 1},{f + rectangles[i][0]}"]])
-        #for f in positive_range(strip[1] - rectangles[j][0]):
-            # ¬udj,i ∨ ¬pyi,f+hj ∨ pxj,f
-            if v2:
-                if f"py{i + 1},{f + rectangles[j][0]}" in variables and f"py{j + 1},{f}" in variables:
-                    cnf.append([-variables[f"r{j + 1}"],
-                                -variables[f"ud{j + 1},{i + 1}"],
-                                variables[f"py{j + 1},{f}"],
-                                -variables[f"py{i + 1},{f + rectangles[j][0]}"]])
+                                -variables[f"py{i + 1},{f + j_height}"]])
 
     for i in range(len(rectangles)):
         for j in range(i + 1, len(rectangles)):
             # lri,j ∨ lrj,i ∨ udi,j ∨ udj,i
             #Large-rectangles horizontal
-            if rectangles[i][0] + rectangles[j][0] > strip[0]:
-                non_overlapping(i, j, False, False, True, True)
+            if rectangles[i][0] + rectangles[j][0] > width:
+                non_overlapping(False, i, j, False, False, True, True)
+                non_overlapping(True, i, j, False, False, True, True)
 
             #Large-rectangles vertical
-            if rectangles[i][1] + rectangles[j][1] > strip[1]:
-                non_overlapping(i, j, True, True, False, False)
+            if rectangles[i][1] + rectangles[j][1] > height:
+                non_overlapping(False, i, j, True, True, False, False)
+                non_overlapping(True, i, j, True, True, False, False)
 
             #Same-sized rectangles
             elif rectangles[i] == rectangles[j]:
-                non_overlapping(i, j, True, False, True, True)
+                non_overlapping(False, i, j, True, False, True, True)
+                non_overlapping(True, i, j, True, False, True, True)
             #
             #largest width rectangle
-            elif rectangles[i][0] == max_width and rectangles[j][0] > (strip[0] - max_width) / 2:
-                non_overlapping(i, j, False, True, True, True)
+            elif rectangles[i][0] == max_width and rectangles[j][0] > (width - max_width) / 2:
+                non_overlapping(False, i, j, False, True, True, True)
+                non_overlapping(True, i, j, False, True, True, True)
             #
             #largest height rectangle
-            elif rectangles[i][1] == max_height and rectangles[j][1] > (strip[1] - max_height) / 2:
-                non_overlapping(i, j, True, True, False, True)
-
+            elif rectangles[i][1] == max_height and rectangles[j][1] > (height - max_height) / 2:
+                non_overlapping(False, i, j, True, True, False, True)
+                non_overlapping(True, i, j, True, True, False, True)
            #normal rectangles
             else:
-                non_overlapping(i, j, True, True, True, True)
+                non_overlapping(False, i, j, True, True, True, True)
+                non_overlapping(True, i, j, True, True, True, True)
 
 
 
-    # Domain encoding for px and py: 0 <= x <= strip[0] and 0 <= y <= strip[1]
-    # equal to: px(i, W-wi) ^ !px(i,-1) and py(i, H-hi) ^ !py(i,-1)
+    # Domain encoding
 
     for i in range(len(rectangles)):
-        for e in range(strip[0] - rectangles[i][0], strip[0]):
-            if f"px{i + 1},{e}" in variables:
-                cnf.append([variables[f"r{i + 1}"],
-                            variables[f"px{i + 1},{e}"]])
-        for f in range(strip[1] - rectangles[i][1], strip[1]):
-            if f"py{i + 1},{f}" in variables:
-                cnf.append([variables[f"r{i + 1}"],
-                            variables[f"py{i + 1},{f}"]])
+        if rectangles[i][0] > width:
+            cnf.append([variables[f"r{i + 1}"]])
+        else:
+            for e in range(width - rectangles[i][0], width):
+                    cnf.append([variables[f"r{i + 1}"],
+                                variables[f"px{i + 1},{e}"]])
+        if rectangles[i][1] > height:
+            cnf.append([variables[f"r{i + 1}"]])
+        else:
+            for f in range(height - rectangles[i][1], height):
+                    cnf.append([variables[f"r{i + 1}"],
+                                variables[f"py{i + 1},{f}"]])
+
         # Rotated
-        for e in range(strip[0] - rectangles[i][1], strip[0]):
-            if f"px{i + 1},{e}" in variables:
-                cnf.append([-variables[f"r{i + 1}"],
-                            variables[f"px{i + 1},{e}"]])
-        for f in range(strip[1] - rectangles[i][0], strip[1]):
-            if f"py{i + 1},{f}" in variables:
+        if rectangles[i][1] > width:
+            cnf.append([-variables[f"r{i + 1}"]])
+        else:
+            for e in range(width - rectangles[i][1], width):
+                    cnf.append([-variables[f"r{i + 1}"],
+                                variables[f"px{i + 1},{e}"]])
+        if rectangles[i][0] > height:
+            cnf.append([-variables[f"r{i + 1}"]])
+        else:
+            for f in range(height - rectangles[i][0], height):
                 cnf.append([-variables[f"r{i + 1}"],
                             variables[f"py{i + 1},{f}"]])
 
-    print(variables, counter)
     with Solver(name="mc") as solver:
         solver.append_formula(cnf)
 
@@ -287,7 +250,6 @@ def OPP(strip):
             pos = [[0 for i in range(2)] for j in range(len(rectangles))]
             rotation = []
             model = solver.get_model()
-            print(model)
             print("SAT")
             result = {}
             for var in model:
@@ -299,14 +261,14 @@ def OPP(strip):
 
             for i in range(len(rectangles)):
                 rotation.append(result[f"r{i + 1}"])
-                for e in range(strip[0] - rectangles[i][0] + 1):
+                for e in range(width - 1):
                     if result[f"px{i + 1},{e}"] == False and result[f"px{i + 1},{e + 1}"] == True:
                         print(f"x{i + 1} = {e + 1}")
                         pos[i][0] = e + 1
                     if e == 0 and result[f"px{i + 1},{e}"] == True:
                         print(f"x{i + 1} = 0")
                         pos[i][0] = 0
-                for f in range(strip[1] - rectangles[i][1] + 1):
+                for f in range(height - 1):
                     if result[f"py{i + 1},{f}"] == False and result[f"py{i + 1},{f + 1}"] == True:
                         print(f"y{i + 1} = {f + 1}")
                         pos[i][1] = f + 1
@@ -324,7 +286,7 @@ def OPP(strip):
 
 #solving 2SPP
 heights = [int(rectangle[1]) for rectangle in rectangles]
-area = math.floor(sum([int(rectangle[0] * rectangle[1]) for rectangle in rectangles]) / width)
+area = math.ceil(sum([int(rectangle[0] * rectangle[1]) for rectangle in rectangles]) / width)
 upper_bound = sum(heights)
 lower_bound = area
 optimal_height = 0
@@ -356,7 +318,7 @@ def SPP(lower, upper):
 SPP(lower_bound, upper_bound)
 #print(optimal_height)
 #display_solution((width, optimal_height), rectangles, optimal_pos)
-
+#OPP((14, 14))
 
 stop = timeit.default_timer()
 print('Time: ', stop - start)
