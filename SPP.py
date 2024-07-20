@@ -1,16 +1,13 @@
 import math
 
 from pysat.formula import CNF
-from pysat.solvers import Solver
+from pysat.solvers import Glucose42
 
 import fileinput
-import matplotlib
 import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle
-# Define the rectangles and the strip
 import timeit
 
-start = timeit.default_timer()
+start = timeit.default_timer() #start the clock
 
 # Initialize the CNF formula
 
@@ -43,10 +40,13 @@ def display_solution(strip, rectangles, pos_circuits):
     plt.show()
 
 #read file input
-input = read_file_instance(41)
+input = read_file_instance(20) #change the instance here (instance 0 - 40)
 width = int(input[0])
 n_rec = int(input[1])
 rectangles =  [[int(val) for val in i.split()] for i in input[-n_rec:]]
+global variables_length, clauses_length
+variables_length = 0
+clauses_length = 0
 #print(rectangles)
 
 
@@ -62,9 +62,12 @@ def OPP(strip):
     height = strip[1]
     variables = {}
     counter = 1
+
+    # find max height and width rectangles for largest rectangle symmetry breaking
     max_height = max([int(rectangle[1]) for rectangle in rectangles])
     max_width = max([int(rectangle[0]) for rectangle in rectangles])
 
+    # create lr, ud variables
     for i in range(len(rectangles)):
         for j in range(len(rectangles)):
             variables[f"lr{i + 1},{j + 1}"] = counter  # lri,rj
@@ -78,11 +81,13 @@ def OPP(strip):
             variables[f"py{i + 1},{f}"] = counter  # pyi,f
             counter += 1
 
-    # Add the 2-literal axiom clauses
+    # Add the 2-literal axiom clauses (order constraint)
     for i in range(len(rectangles)):
+       # ¬pxi,e ∨ pxi,e+1
         for e in range(width - rectangles[i][0] + 1):  # -1 because we're using e+1 in the clause
             cnf.append([-variables[f"px{i + 1},{e}"],
                         variables[f"px{i + 1},{e + 1}"]])
+        #  ¬pyi,f ∨ pxi,f+1
         for f in range(height - rectangles[i][1] + 1):  # -1 because we're using f+1 in the clause
             cnf.append([-variables[f"py{i + 1},{f}"],
                         variables[f"py{i + 1},{f + 1}"]])
@@ -95,6 +100,7 @@ def OPP(strip):
         j_width = rectangles[j][0]
         j_height = rectangles[j][1]
 
+        # lri, j ∨ lrj, i ∨ udi, j ∨ udj, i
         four_literal = []
         if h1: four_literal.append(variables[f"lr{i + 1},{j + 1}"])
         if h2: four_literal.append(variables[f"lr{j + 1},{i + 1}"])
@@ -192,7 +198,8 @@ def OPP(strip):
         cnf.append([variables[f"py{i + 1},{height - rectangles[i][1]}"]])  # py(i, H-hi)
 
 
-    with Solver(name="mc") as solver:
+    # add all clauses to SAT solver
+    with Glucose42() as solver:
         solver.append_formula(cnf)
         if solver.solve():
             pos = [[0 for i in range(2)] for j in range(len(rectangles))]
@@ -206,6 +213,7 @@ def OPP(strip):
                     result[list(variables.keys())[list(variables.values()).index(-var)]] = False
             #print(result)
 
+            # from SAT result, decode into rectangles' position
             for i in range(len(rectangles)):
                 for e in range(width - rectangles[i][0] + 1):
                     if result[f"px{i + 1},{e}"] == False and result[f"px{i + 1},{e + 1}"] == True:
@@ -221,7 +229,7 @@ def OPP(strip):
                     if f == 0 and result[f"py{i + 1},{f}"] == True:
                         print(f"y{i + 1} = 0")
                         pos[i][1] = 0
-            #print(pos)
+            print(pos)
             display_solution(strip, rectangles, pos)
             return(["sat", pos])
 
@@ -234,12 +242,12 @@ heights = [int(rectangle[1]) for rectangle in rectangles]
 area = math.floor(sum([int(rectangle[0] * rectangle[1]) for rectangle in rectangles]) / width)
 upper_bound = sum(heights)
 lower_bound = max(area, max(heights))
-print(rectangles)
-print(sum([int(rectangle[0] * rectangle[1]) for rectangle in rectangles]))
+global optimal_height
 optimal_height = 0
 optimal_pos = []
 
 
+# SPP searches for optimal height by repeatedly solving OPP with bisection method
 def SPP(lower, upper):
     if lower <= upper:
         mid = (lower + upper) // 2
@@ -263,9 +271,5 @@ def SPP(lower, upper):
         return -1
 
 SPP(lower_bound, upper_bound)
-#print(optimal_height)
-display_solution((width, optimal_height), rectangles, optimal_pos)
-
-
 stop = timeit.default_timer()
 print('Time: ', stop - start)
