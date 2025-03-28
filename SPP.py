@@ -1,4 +1,5 @@
 import math
+import signal
 
 from pysat.formula import CNF
 from pysat.solvers import Glucose42
@@ -6,6 +7,7 @@ from pysat.solvers import Glucose42
 import fileinput
 import matplotlib.pyplot as plt
 import timeit
+import pandas as pd
 
 start = timeit.default_timer() #start the clock
 
@@ -56,7 +58,8 @@ def positive_range(end):
     return range(end)
 
 def OPP(strip):
-# Define the variables
+    global variables_length, clauses_length
+    # Define the variables
     cnf = CNF()
     width = strip[0]
     height = strip[1]
@@ -201,7 +204,11 @@ def OPP(strip):
     # add all clauses to SAT solver
     with Glucose42() as solver:
         solver.append_formula(cnf)
-        if solver.solve():
+        variables_length = len(variables)
+        clauses_length = len(cnf.clauses)
+        
+        is_sat = solver.solve()
+        if is_sat:
             pos = [[0 for i in range(2)] for j in range(len(rectangles))]
             model = solver.get_model()
             print("SAT")
@@ -217,23 +224,17 @@ def OPP(strip):
             for i in range(len(rectangles)):
                 for e in range(width - rectangles[i][0] + 1):
                     if result[f"px{i + 1},{e}"] == False and result[f"px{i + 1},{e + 1}"] == True:
-                        print(f"x{i + 1} = {e + 1}")
                         pos[i][0] = e + 1
                     if e == 0 and result[f"px{i + 1},{e}"] == True:
-                        print(f"x{i + 1} = 0")
                         pos[i][0] = 0
                 for f in range(height - rectangles[i][1] + 1):
                     if result[f"py{i + 1},{f}"] == False and result[f"py{i + 1},{f + 1}"] == True:
-                        print(f"y{i + 1} = {f + 1}")
                         pos[i][1] = f + 1
                     if f == 0 and result[f"py{i + 1},{f}"] == True:
-                        print(f"y{i + 1} = 0")
                         pos[i][1] = 0
-            print(pos)
-            display_solution(strip, rectangles, pos)
             return(["sat", pos])
-
         else:
+            print("UNSAT")
             return("unsat")
 
 
@@ -241,7 +242,7 @@ def OPP(strip):
 heights = [int(rectangle[1]) for rectangle in rectangles]
 area = math.floor(sum([int(rectangle[0] * rectangle[1]) for rectangle in rectangles]) / width)
 upper_bound = sum(heights)
-lower_bound = max(area, max(heights))
+lower_bound = max(math.ceil(sum([int(rectangle[0] * rectangle[1]) for rectangle in rectangles]) / width), max(heights))
 global optimal_height
 optimal_height = 0
 optimal_pos = []
@@ -249,27 +250,114 @@ optimal_pos = []
 
 # SPP searches for optimal height by repeatedly solving OPP with bisection method
 def SPP(lower, upper):
+    global optimal_height, optimal_pos
     if lower <= upper:
         mid = (lower + upper) // 2
-        print(lower, upper, mid)
+        print(f"Trying height: {mid} (lower={lower}, upper={upper})")
         OPP_result = OPP((width, mid))
-        if OPP_result[0] == "sat":
-            global optimal_height, optimal_pos
-            optimal_height = mid
-            optimal_pos = OPP_result[1]
-
-            if lower + 1 == upper:
-                return -1
-            else:
-                SPP(lower, mid)
-        else:
+        if OPP_result == "unsat":
             if lower + 1 == upper:
                 return -1
             else:
                 SPP(mid, upper)
-    else:
-        return -1
+        else:
+            optimal_height = mid
+            optimal_pos = OPP_result[1]
+            if lower + 1 == upper:
+                return -1
+            else:
+                SPP(lower, mid)
+    return optimal_height
 
-SPP(lower_bound, upper_bound)
-stop = timeit.default_timer()
-print('Time: ', stop - start)
+# Add this timeout handler function
+def timeout_handler(signum, frame):
+    raise TimeoutError("Timeout reached (300s)")
+
+# Main execution
+results_data = []
+
+try:  # Add outer try-except block for KeyboardInterrupt
+    for instance in [38, 39]:  # Run specific instances 33, 38, and 40
+        try:
+            print(f"\nProcessing instance {instance}")
+            start = timeit.default_timer()
+
+            # Set timeout of 300 seconds (5 minutes)
+            signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(10)  # 300 secondủ
+
+            # read file input
+            input = read_file_instance(instance)
+            width = int(input[0])
+            n_rec = int(input[1])
+            rectangles = [[int(val) for val in i.split()] for i in input[-n_rec:]]
+            
+            # Initialize variables for tracking
+            variables_length = 0
+            clauses_length = 0
+            optimal_height = float('inf')
+            optimal_pos = []
+
+            # Calculate initial bounds
+            heights = [int(rectangle[1]) for rectangle in rectangles]
+            area = math.floor(sum([int(rectangle[0] * rectangle[1]) for rectangle in rectangles]) / width)
+            upper_bound = sum(heights)
+            lower_bound = max(math.ceil(sum([int(rectangle[0] * rectangle[1]) for rectangle in rectangles]) / width), max(heights))
+
+            # Run SPP
+            final_height = SPP(lower_bound, upper_bound)
+            
+            # Disable the alarm after successful completion
+            signal.alarm(0)
+            
+            stop = timeit.default_timer()
+            runtime = stop - start
+
+            # Store results
+            instance_result = {
+                'Instance': instance,
+                'Variables': variables_length,
+                'Clauses': clauses_length,
+                'Runtime': runtime,
+                'Optimal_Height': optimal_height if optimal_height != float('inf') else 'TIMEOUT/ERROR'
+            }
+            results_data.append(instance_result)
+            
+            print(f"Instance {instance} completed - Runtime: {runtime:.2f}s, Height: {optimal_height}")
+
+        except TimeoutError as e:
+            signal.alarm(0)  # Disable the alarm
+            print(f"Instance {instance}: {str(e)}")
+            results_data.append({
+                'Instance': instance,
+                'Variables': variables_length,
+                'Clauses': clauses_length,
+                'Runtime': '300+',
+                'Optimal_Height': 'TIMEOUT'
+            })
+            continue
+        except Exception as e:
+            signal.alarm(0)  # Disable the alarm
+            print(f"Error in instance {instance}: {str(e)}")
+            results_data.append({
+                'Instance': instance,
+                'Variables': 'ERROR',
+                'Clauses': 'ERROR',
+                'Runtime': 'ERROR',
+                'Optimal_Height': 'ERROR'
+            })
+            continue
+
+    # Save results to Excel
+    df = pd.DataFrame(results_data)
+    df.to_excel('SPP.xlsx', index=False)
+    print("\nResults saved to SPP.xlsx")
+
+except KeyboardInterrupt:
+    print("\nKeyboard interrupt detected. Printing current results:")
+    for result in results_data:
+        print(result)
+    # Optionally save partial results
+    df = pd.DataFrame(results_data)
+    df.to_excel('SPP_partial.xlsx', index=False)
+    print("\nPartial results saved to SPP_partial.xlsx")
