@@ -14,11 +14,7 @@ import matplotlib.pyplot as plt
 import timeit
 import pandas as pd
 
-# Create SPP folder if it doesn't exist
-if not os.path.exists('SPP'):
-    os.makedirs('SPP')
-
-def display_solution(strip, rectangles, pos_circuits, instance_name):
+def display_solution(strip, rectangles, pos_circuits):
     # define Matplotlib figure and axis
     fig, ax = plt.subplots()
     ax = plt.gca()
@@ -35,10 +31,8 @@ def display_solution(strip, rectangles, pos_circuits, instance_name):
     ax.set_yticks(range(strip[1] + 1))
     ax.set_xlabel('width')
     ax.set_ylabel('height')
-    
-    # Save the plot to SPP folder
-    plt.savefig(f'SPP/{instance_name}.png')
-    plt.close()
+    # display plot
+    plt.show()
 
 def read_file_instance(instance_name):
     """
@@ -126,6 +120,10 @@ def OPP(strip):
     variables = {}
     counter = 1
 
+    # find max height and width rectangles for largest rectangle symmetry breaking
+    max_height = max([int(rectangle[1]) for rectangle in rectangles])
+    max_width = max([int(rectangle[0]) for rectangle in rectangles])
+
     # create lr, ud variables
     for i in range(len(rectangles)):
         for j in range(len(rectangles)):
@@ -204,9 +202,26 @@ def OPP(strip):
                             variables[f"py{j + 1},{f}"],
                             -variables[f"py{i + 1},{f + j_height}"]])
 
+    # Symmetry Breaking
     for i in range(len(rectangles)):
         for j in range(i + 1, len(rectangles)):
-            non_overlapping(i, j, True, True, True, True)
+            # Large-rectangles horizontal
+            if rectangles[i][0] + rectangles[j][0] > width:
+                non_overlapping(i, j, False, False, True, True)
+            # Large-rectangles vertical
+            elif rectangles[i][1] + rectangles[j][1] > height:
+                non_overlapping(i, j, True, True, False, False)
+            # Same-sized rectangles
+            elif rectangles[i] == rectangles[j]:
+                non_overlapping(i, j, True, False, True, True)
+            # Large-rectangles horizontal symmetry breaking
+            elif rectangles[i][0] == max_width and rectangles[j][0] > (width - max_width) / 2:
+                non_overlapping(i, j, False, True, True, True)
+            # Large-rectangles vertical symmetry breaking
+            elif rectangles[i][1] == max_height and rectangles[j][1] > (height - max_height) / 2:
+                non_overlapping(i, j, True, True, False, True)
+            else:
+                non_overlapping(i, j, True, True, True, True)
 
     for i in range(len(rectangles)):
         cnf.append([variables[f"px{i + 1},{width - rectangles[i][0]}"]])
@@ -262,7 +277,7 @@ def SPP(lower, upper):
 results_data = []
 
 try:
-    instances_to_run = get_instances_from_c(level=1)
+    instances_to_run = get_instances_from_c(level=3)
 
     for instance_name in instances_to_run:
         try:
@@ -273,16 +288,12 @@ try:
             input = read_file_instance(instance_name)
             width = int(input[0])
             n_rec = int(input[1])
-            print(f"Debug - Width: {width}, Number of rectangles: {n_rec}")
-            print(f"Debug - Input length: {len(input)}, Expected rectangles: {n_rec}")
             rectangles = []
             for i in range(2, 2 + n_rec):
                 if i < len(input):
                     rect = [int(val) for val in input[i].split()]
-                    print(f"Debug - Rectangle {i-1}: {rect}")
                     rectangles.append(rect)
                 else:
-                    print(f"Error - Missing rectangle data at line {i}")
                     raise IndexError(f"Missing rectangle data at line {i}")
             
             # Initialize variables for tracking
@@ -302,10 +313,6 @@ try:
             
             stop = timeit.default_timer()
             runtime = stop - start
-
-            # Display and save the solution if we found one
-            if optimal_height != float('inf'):
-                display_solution((width, optimal_height), rectangles, optimal_pos, instance_name)
 
             # Store results
             instance_result = {
@@ -332,8 +339,8 @@ try:
 
     # Save results to Excel
     df = pd.DataFrame(results_data)
-    df.to_excel('SPP.xlsx', index=False)
-    print("\nResults saved to SPP.xlsx")
+    df.to_excel('SPP_SB.xlsx', index=False)
+    print("\nResults saved to SPP_SB.xlsx")
 
 except KeyboardInterrupt:
     print("\nKeyboard interrupt detected. Printing current results:")
