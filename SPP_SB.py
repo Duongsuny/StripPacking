@@ -14,7 +14,11 @@ import matplotlib.pyplot as plt
 import timeit
 import pandas as pd
 
-def display_solution(strip, rectangles, pos_circuits):
+# Create SPP folder if it doesn't exist
+if not os.path.exists('SPP_SB'):
+    os.makedirs('SPP_SB')
+
+def display_solution(strip, rectangles, pos_circuits, instance_name):
     # define Matplotlib figure and axis
     fig, ax = plt.subplots()
     ax = plt.gca()
@@ -31,8 +35,10 @@ def display_solution(strip, rectangles, pos_circuits):
     ax.set_yticks(range(strip[1] + 1))
     ax.set_xlabel('width')
     ax.set_ylabel('height')
-    # display plot
-    plt.show()
+    
+    # Save the plot to SPP folder
+    plt.savefig(f'SPP/{instance_name}.png')
+    plt.close()
 
 def read_file_instance(instance_name):
     """
@@ -120,10 +126,6 @@ def OPP(strip):
     variables = {}
     counter = 1
 
-    # find max height and width rectangles for largest rectangle symmetry breaking
-    max_height = max([int(rectangle[1]) for rectangle in rectangles])
-    max_width = max([int(rectangle[0]) for rectangle in rectangles])
-
     # create lr, ud variables
     for i in range(len(rectangles)):
         for j in range(len(rectangles)):
@@ -201,6 +203,10 @@ def OPP(strip):
                 cnf.append([-variables[f"ud{j + 1},{i + 1}"],
                             variables[f"py{j + 1},{f}"],
                             -variables[f"py{i + 1},{f + j_height}"]])
+        
+    # find max height and width rectangles for largest rectangle symmetry breaking
+    max_height = max([int(rectangle[1]) for rectangle in rectangles])
+    max_width = max([int(rectangle[0]) for rectangle in rectangles])
 
     # Symmetry Breaking
     for i in range(len(rectangles)):
@@ -237,8 +243,8 @@ def OPP(strip):
     process = multiprocessing.Process(target=run_solver, args=(cnf, variables, rectangles, width, height, result_queue))
     process.start()
     
-    # Wait for 300 seconds
-    process.join(timeout=300)
+    # Wait for 600 seconds
+    process.join(timeout=600)
     
     # If process is still alive after timeout, terminate it
     if process.is_alive():
@@ -277,7 +283,7 @@ def SPP(lower, upper):
 results_data = []
 
 try:
-    instances_to_run = get_instances_from_c(level=3)
+    instances_to_run = get_instances_from_c()
 
     for instance_name in instances_to_run:
         try:
@@ -288,12 +294,16 @@ try:
             input = read_file_instance(instance_name)
             width = int(input[0])
             n_rec = int(input[1])
+            print(f"Debug - Width: {width}, Number of rectangles: {n_rec}")
+            print(f"Debug - Input length: {len(input)}, Expected rectangles: {n_rec}")
             rectangles = []
             for i in range(2, 2 + n_rec):
                 if i < len(input):
                     rect = [int(val) for val in input[i].split()]
+                    print(f"Debug - Rectangle {i-1}: {rect}")
                     rectangles.append(rect)
                 else:
+                    print(f"Error - Missing rectangle data at line {i}")
                     raise IndexError(f"Missing rectangle data at line {i}")
             
             # Initialize variables for tracking
@@ -313,6 +323,10 @@ try:
             
             stop = timeit.default_timer()
             runtime = stop - start
+
+            # Display and save the solution if we found one
+            if optimal_height != float('inf'):
+                display_solution((width, optimal_height), rectangles, optimal_pos, instance_name)
 
             # Store results
             instance_result = {
@@ -347,5 +361,5 @@ except KeyboardInterrupt:
     for result in results_data:
         print(result)
     df = pd.DataFrame(results_data)
-    df.to_excel('SPP.xlsx', index=False)
-    print("\nPartial results saved to SPP.xlsx")
+    df.to_excel('SPP_SB.xlsx', index=False)
+    print("\nPartial results saved to SPP_SB.xlsx")

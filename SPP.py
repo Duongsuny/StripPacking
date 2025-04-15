@@ -5,6 +5,7 @@ import os
 import multiprocessing
 import threading
 import time
+import traceback
 
 from pysat.formula import CNF
 from pysat.solvers import Glucose42
@@ -222,8 +223,8 @@ def OPP(strip):
     process = multiprocessing.Process(target=run_solver, args=(cnf, variables, rectangles, width, height, result_queue))
     process.start()
     
-    # Wait for 300 seconds
-    process.join(timeout=300)
+    # Wait for 600 seconds
+    process.join(timeout=600)
     
     # If process is still alive after timeout, terminate it
     if process.is_alive():
@@ -262,7 +263,7 @@ def SPP(lower, upper):
 results_data = []
 
 try:
-    instances_to_run = get_instances_from_c(level=1)
+    instances_to_run = get_instances_from_c()
 
     for instance_name in instances_to_run:
         try:
@@ -320,7 +321,11 @@ try:
             print(f"Instance {instance_name} completed - Runtime: {runtime:.2f}s, Height: {optimal_height}")
 
         except Exception as e:
-            print(f"Error in instance {instance_name}: {str(e)}")
+            print(f"\nError in instance {instance_name}:")
+            print(f"Exception type: {type(e).__name__}")
+            print(f"Exception message: {str(e)}")
+            print("\nTraceback:")
+            traceback.print_exc()
             results_data.append({
                 'Instance': instance_name,
                 'Variables': 'ERROR',
