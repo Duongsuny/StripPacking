@@ -72,16 +72,43 @@ def solve_strip_packing(widths, heights, strip_width, time_limit=300):
         return None
 
 # Read file function
-def read_file_instance(n_instance):
+def read_file_instance(instance_name):
+    """
+    Read file from c folder
+    instance_name: name of the instance (e.g., "C1P1")
+    """
     s = ''
-    filepath = f"inputs/ins-{n_instance}.txt"
-    try:
-        with open(filepath, 'r') as file:
-            s = file.read()
-        return s.splitlines()
-    except FileNotFoundError:
-        print(f"Error: File inputs/ins-{n_instance}.txt not found")
-        return None
+    filepath = f"c/{instance_name}.txt"
+    for line in fileinput.input(files=filepath):
+        s += line
+    # Split lines and remove any empty strings
+    lines = [line.strip() for line in s.splitlines() if line.strip()]
+    print(f"Debug - Reading {instance_name}:")
+    print(f"Number of lines: {len(lines)}")
+    print(f"First line: {lines[0]}")
+    print(f"Second line: {lines[1]}")
+    print(f"Last line: {lines[-1]}")
+    return lines
+
+def get_instances_from_c(level=None, start_level=None, end_level=None, instance=None):
+    """
+    Get list of instances from c folder based on parameters
+    """
+    instances = []
+    if level is not None:
+        for p in range(1, 4):
+            instances.append(f"C{level}P{p}")
+    elif start_level is not None and end_level is not None:
+        for l in range(start_level, end_level + 1):
+            for p in range(1, 4):
+                instances.append(f"C{l}P{p}")
+    elif instance is not None:
+        instances.append(instance)
+    else:
+        for l in range(1, 8):
+            for p in range(1, 4):
+                instances.append(f"C{l}P{p}")
+    return instances
 
 # Display solution function
 def display_solution(strip, rectangles, pos_circuits, rotations):
@@ -112,7 +139,7 @@ def main():
     results = []
     time_limit = 300  # 300 seconds timeout
     
-    for n_instance in [33, 38, 40]:  # Run instances 31 to 40
+    for n_instance in get_instances_from_c(level=1):  # Run instances 31 to 40
         try:
             print(f"\nProcessing instance {n_instance}")
             input_data = read_file_instance(n_instance)

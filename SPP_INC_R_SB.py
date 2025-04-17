@@ -392,7 +392,7 @@ def positive_range(end):
 results_data = []
 
 try:
-    instances_to_run = get_instances_from_c()
+    instances_to_run = get_instances_from_c(level=1)
 
     for instance_name in instances_to_run:
         try:

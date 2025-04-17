@@ -475,7 +475,7 @@ def positive_range(end):
 results_data = []
 
 try:
-    instances_to_run = get_instances_from_c()
+    instances_to_run = get_instances_from_c(level=1)
 
     for instance_name in instances_to_run:
         try:
@@ -522,8 +522,8 @@ try:
             runtime = stop - start
 
             # Display and save the solution if we found one
-            if optimal_height != float('inf'):
-                display_solution((width, optimal_height), rectangles, optimal_pos, optimal_rot, instance_name)
+            #if optimal_height != float('inf'):
+                #display_solution((width, optimal_height), rectangles, optimal_pos, optimal_rot, instance_name)
 
             # Store results
             instance_result = {

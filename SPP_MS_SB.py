@@ -8,6 +8,7 @@ import pandas as pd
 import os
 import tempfile
 import subprocess
+import traceback  # Add this import at the top of your file
 
 from pysat.formula import CNF
 from pysat.solvers import Glucose42
@@ -302,7 +303,7 @@ def SPP_MaxSAT(width, rectangles, lower_bound, upper_bound):
                             if val == '1':
                                 true_vars.add(i + 1)  # 1-indexed
                     
-                    print(f"Found {len(true_vars)} true variables out of {len(binary_string)} total")
+                    #print(f"Found {len(true_vars)} true variables out of {len(binary_string)} total")
                     
                     # Extract height variables and find minimum height where ph_h is true
                     ph_true_heights = []
@@ -417,7 +418,7 @@ def positive_range(end):
 results_data = []
 
 try:
-    instances_to_run = get_instances_from_c()
+    instances_to_run = get_instances_from_c(level=1)
 
     for instance_name in instances_to_run:
         try:
@@ -463,8 +464,8 @@ try:
             runtime = stop - start
 
             # Display and save the solution if we found one
-            if optimal_height != float('inf'):
-                display_solution((width, optimal_height), rectangles, optimal_pos, instance_name)
+            #if optimal_height != float('inf'):
+             #   display_solution((width, optimal_height), rectangles, optimal_pos, instance_name)
 
             # Store results
             instance_result = {
@@ -480,6 +481,7 @@ try:
 
         except Exception as e:
             print(f"Error in instance {instance_name}: {str(e)}")
+            traceback.print_exc()  # Print the traceback for the error
             results_data.append({
                 'Instance': instance_name,
                 'Variables': 'ERROR',

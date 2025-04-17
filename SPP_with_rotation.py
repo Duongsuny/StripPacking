@@ -1,6 +1,6 @@
 import math
 from pysat.formula import CNF
-from pysat.solvers import Solver
+from pysat.solvers import Glucose4
 import fileinput
 import matplotlib.pyplot as plt
 import timeit
@@ -218,7 +218,7 @@ def OPP(strip):
                 cnf.append([-variables[f"r{i + 1}"],
                             variables[f"py{i + 1},{f}"]])
 
-    with Solver(name="mc") as solver:  # Add all cnf to solver
+    with Glucose4() as solver:  # Use Glucose4 solver
         solver.append_formula(cnf)
 
         if solver.solve():
@@ -281,6 +281,7 @@ def SPP(lower, upper):
 
 SPP(lower_bound, upper_bound)
 stop = timeit.default_timer()
+print(rectangles)
 print(f"Optimal strip height: {optimal_height}")
 print(f"Solve time: {stop - start:.2f} seconds")
 print(f"Lower bound: {lower_bound}")
