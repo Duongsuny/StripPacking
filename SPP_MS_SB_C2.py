@@ -16,26 +16,25 @@ from pysat.solvers import Glucose42
 start = timeit.default_timer() # start clock
 
 # Create SPP folder if it doesn't exist
-if not os.path.exists('SPP_MS_SB'):
-    os.makedirs('SPP_MS_SB')
+if not os.path.exists('SPP_MS_SB_C2'):
+    os.makedirs('SPP_MS_SB_C2')
 
-def read_file_instance(instance_name):
-    """
-    Read file from c folder
-    instance_name: name of the instance (e.g., "C1P1")
-    """
+def read_file_instance(n_instance):
     s = ''
-    filepath = f"c/{instance_name}.txt"
+    filepath = "inputs/ins-{}.txt".format(n_instance)
     for line in fileinput.input(files=filepath):
         s += line
-    # Split lines and remove any empty strings
-    lines = [line.strip() for line in s.splitlines() if line.strip()]
-    print(f"Debug - Reading {instance_name}:")
-    print(f"Number of lines: {len(lines)}")
-    print(f"First line: {lines[0]}")
-    print(f"Second line: {lines[1]}")
-    print(f"Last line: {lines[-1]}")
-    return lines
+    return s.splitlines()
+
+instances= [ "",
+  "HT01(c1p1)", "HT02(c1p2)", "HT03(c1p3)", "HT04(c2p1)", "HT05(c2p2)", "HT06(c2p3)", 
+  "HT07(c3p1)", "HT08(c3p2)", "HT09(c3p3)", 
+  "CGCUT01", "CGCUT02", "CGCUT03", 
+  "GCUT01", "GCUT02", "GCUT03", "GCUT04", 
+  "NGCUT01", "NGCUT02", "NGCUT03", "NGCUT04", "NGCUT05", "NGCUT06", "NGCUT07", 
+  "NGCUT08", "NGCUT09", "NGCUT10", "NGCUT11", "NGCUT12", 
+  "BENG01", "BENG02", "BENG03", "BENG04", "BENG05", "BENG06", "BENG07", "BENG08", "BENG09", "BENG10"
+]
 
 def display_solution(strip, rectangles, pos_circuits, instance_name):
     # define Matplotlib figure and axis
@@ -56,7 +55,7 @@ def display_solution(strip, rectangles, pos_circuits, instance_name):
     ax.set_ylabel('height')
     
     # Save the plot to SPP folder
-    plt.savefig(f'SPP_MS_SB/{instance_name}.png')
+    plt.savefig(f'SPP_MS_SB_C2/{instance_name}.png')
     plt.close()
 
 def positive_range(end):
@@ -184,22 +183,28 @@ def SPP_MaxSAT(width, rectangles, lower_bound, upper_bound):
                         hard_clauses.append([-variables[f"ud{j + 1},{i + 1}"],
                                       variables[f"py{j + 1},{y_pos}"], 
                                       -variables[f"py{i + 1},{y_pos + j_height}"]])
-                
-        # Add non-overlapping constraints for all pairs of rectangles
-        for i in range(n_rectangles):
-            for j in range(i + 1, n_rectangles):
-                # Large-rectangles horizontal
-                if rectangles[i][0] + rectangles[j][0] > width:
-                    non_overlapping(i, j, False, False, True, True)
-                # Large rectangles vertical
-                elif rectangles[i][1] + rectangles[j][1] > upper_bound:
-                    non_overlapping(i, j, True, True, False, False)
-                # Same-sized rectangles
-                elif rectangles[i] == rectangles[j]:
-                    non_overlapping(i, j, True, False, True, True)
-                # Normal rectangles
-                else:
-                    non_overlapping(i, j, True, True, True, True)
+        
+    max_height = max([int(rectangle[1]) for rectangle in rectangles])
+    max_width = max([int(rectangle[0]) for rectangle in rectangles])
+    second_max_width = max([int(rectangle[0]) for rectangle in rectangles if int(rectangle[0]) != max_width])
+
+    # Symmetry Breaking - Config 2
+    for i in range(len(rectangles)):
+        for j in range(i + 1, len(rectangles)):
+            #Fix the position of the largest rectangle and the second largest rectangle
+            if rectangles[i][0] == max_width and rectangles[j][0] == second_max_width:
+                non_overlapping(i, j, True, False, True, False)
+            # Large-rectangles horizontal
+            if rectangles[i][0] + rectangles[j][0] > width:
+                non_overlapping(i, j, False, False, True, True)
+            # Large-rectangles vertical
+            elif rectangles[i][1] + rectangles[j][1] > upper_bound:
+                non_overlapping(i, j, True, True, False, False)
+            # Same-sized rectangles
+            elif rectangles[i] == rectangles[j]:
+                non_overlapping(i, j, True, False, True, True)
+            else:
+                non_overlapping(i, j, True, True, True, True)
                 
         # Domain encoding to ensure rectangles are placed within strip boundaries
         for i in range(n_rectangles):
@@ -389,26 +394,6 @@ def SPP_MaxSAT(width, rectangles, lower_bound, upper_bound):
             os.unlink(wcnf_file)
         return None, None
 
-def get_instances_from_c(level=None, start_level=None, end_level=None, instance=None):
-    """
-    Get list of instances from c folder based on parameters
-    """
-    instances = []
-    if level is not None:
-        for p in range(1, 4):
-            instances.append(f"C{level}P{p}")
-    elif start_level is not None and end_level is not None:
-        for l in range(start_level, end_level + 1):
-            for p in range(1, 4):
-                instances.append(f"C{l}P{p}")
-    elif instance is not None:
-        instances.append(instance)
-    else:
-        for l in range(1, 8):
-            for p in range(1, 4):
-                instances.append(f"C{l}P{p}")
-    return instances
-
 def positive_range(end):
     if end < 0:
         return []
@@ -418,15 +403,14 @@ def positive_range(end):
 results_data = []
 
 try:
-    instances_to_run = get_instances_from_c(level=1)
-
-    for instance_name in instances_to_run:
+    for instance in range(1, 39):
+        instance_name = instances[instance]
         try:
             print(f"\nProcessing instance {instance_name}")
             start = timeit.default_timer()
 
             # read file input
-            input = read_file_instance(instance_name)
+            input = read_file_instance(instance)
             width = int(input[0])
             n_rec = int(input[1])
             print(f"Debug - Width: {width}, Number of rectangles: {n_rec}")
@@ -493,14 +477,14 @@ try:
 
     # Save results to Excel
     df = pd.DataFrame(results_data)
-    df.to_excel('SPP_MS_SB.xlsx', index=False)
-    print("\nResults saved to SPP_MS_SB.xlsx")
+    df.to_excel('SPP_MS_SB_C2.xlsx', index=False)
+    print("\nResults saved to SPP_MS_SB_C2.xlsx")
 
 except KeyboardInterrupt:
     print("\nKeyboard interrupt detected. Printing current results:")
     for result in results_data:
         print(result)
     df = pd.DataFrame(results_data)
-    df.to_excel('SPP_MS_SB.xlsx', index=False)
-    print("\nPartial results saved to SPP_MS_SB.xlsx")
+    df.to_excel('SPP_MS_SB_C2.xlsx', index=False)
+    print("\nPartial results saved to SPP_MS_SB_C2.xlsx")
             

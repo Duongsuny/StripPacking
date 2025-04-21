@@ -18,23 +18,22 @@ import pandas as pd
 if not os.path.exists('SPP_R'):
     os.makedirs('SPP_R')
 
-def read_file_instance(instance_name):
-    """
-    Read file from c folder
-    instance_name: name of the instance (e.g., "C1P1")
-    """
+def read_file_instance(n_instance):
     s = ''
-    filepath = f"c/{instance_name}.txt"
+    filepath = "inputs/ins-{}.txt".format(n_instance)
     for line in fileinput.input(files=filepath):
         s += line
-    # Split lines and remove any empty strings
-    lines = [line.strip() for line in s.splitlines() if line.strip()]
-    print(f"Debug - Reading {instance_name}:")
-    print(f"Number of lines: {len(lines)}")
-    print(f"First line: {lines[0]}")
-    print(f"Second line: {lines[1]}")
-    print(f"Last line: {lines[-1]}")
-    return lines
+    return s.splitlines()
+
+instances= [ "",
+  "HT01(c1p1)", "HT02(c1p2)", "HT03(c1p3)", "HT04(c2p1)", "HT05(c2p2)", "HT06(c2p3)", 
+  "HT07(c3p1)", "HT08(c3p2)", "HT09(c3p3)", 
+  "CGCUT01", "CGCUT02", "CGCUT03", 
+  "GCUT01", "GCUT02", "GCUT03", "GCUT04", 
+  "NGCUT01", "NGCUT02", "NGCUT03", "NGCUT04", "NGCUT05", "NGCUT06", "NGCUT07", 
+  "NGCUT08", "NGCUT09", "NGCUT10", "NGCUT11", "NGCUT12", 
+  "BENG01", "BENG02", "BENG03", "BENG04", "BENG05", "BENG06", "BENG07", "BENG08", "BENG09", "BENG10"
+]
 
 def display_solution(strip, rectangles, pos_circuits, rotations, instance_name):
     fig, ax = plt.subplots()
@@ -81,41 +80,6 @@ def get_instances_from_c(level=None, start_level=None, end_level=None, instance=
             for p in range(1, 4):
                 instances.append(f"C{l}P{p}")
     return instances
-
-def run_solver(cnf, variables, rectangles, width, height, result_queue):
-    try:
-        with Glucose4() as solver:
-            solver.append_formula(cnf)
-            if solver.solve():
-                pos = [[0 for _ in range(2)] for _ in range(len(rectangles))]
-                rotation = []
-                model = solver.get_model()
-                result = {}
-                for var in model:
-                    if var > 0:
-                        result[list(variables.keys())[list(variables.values()).index(var)]] = True
-                    else:
-                        result[list(variables.keys())[list(variables.values()).index(-var)]] = False
-
-                for i in range(len(rectangles)):
-                    rotation.append(result[f"r{i + 1}"])
-                    for e in range(width - 1):
-                        if result[f"px{i + 1},{e}"] == False and result[f"px{i + 1},{e + 1}"] == True:
-                            pos[i][0] = e + 1
-                        if e == 0 and result[f"px{i + 1},{e}"] == True:
-                            pos[i][0] = 0
-                    for f in range(height - 1):
-                        if result[f"py{i + 1},{f}"] == False and result[f"py{i + 1},{f + 1}"] == True:
-                            pos[i][1] = f + 1
-                        if f == 0 and result[f"py{i + 1},{f}"] == True:
-                            pos[i][1] = 0
-                result_queue.put(["sat", pos, rotation])
-            else:
-                print("UNSAT")
-                result_queue.put("unsat")
-    except Exception as e:
-        print(f"Solver error: {str(e)}")
-        result_queue.put("error")
 
 def positive_range(end):
     if end < 0:
@@ -187,9 +151,6 @@ def OPP(strip):
         cnf.append(four_literal + [i_rotation])
         cnf.append(four_literal + [j_rotation])
 
-        # Optimize range checks
-        max_width = min(width, max(i_width, j_width))
-        max_height = min(height, max(i_height, j_height))
 
         # Add constraints only if they're necessary
         if h1:
@@ -282,28 +243,37 @@ def OPP(strip):
     variables_length = len(variables)
     clauses_length = len(cnf.clauses)
 
-    # Create a queue for the result
-    result_queue = multiprocessing.Queue()
-    
-    # Create a process for running the solver
-    process = multiprocessing.Process(target=run_solver, args=(cnf, variables, rectangles, width, height, result_queue))
-    process.start()
-    
-    # Wait for 600 seconds
-    process.join(timeout=600)
-    
-    # If process is still alive after timeout, terminate it
-    if process.is_alive():
-        process.terminate()
-        process.join()
-        print(f"TIMEOUT for height {height}")
-        return "timeout"
-    
-    try:
-        # Get the result from the queue
-        return result_queue.get(timeout=1)
-    except:
-        return "timeout"
+    with Glucose4() as solver:
+            solver.append_formula(cnf)
+            if solver.solve():
+                pos = [[0 for _ in range(2)] for _ in range(len(rectangles))]
+                rotation = []
+                model = solver.get_model()
+                result = {}
+                for var in model:
+                    if var > 0:
+                        result[list(variables.keys())[list(variables.values()).index(var)]] = True
+                    else:
+                        result[list(variables.keys())[list(variables.values()).index(-var)]] = False
+
+                for i in range(len(rectangles)):
+                    rotation.append(result[f"r{i + 1}"])
+                    for e in range(width - 1):
+                        if result[f"px{i + 1},{e}"] == False and result[f"px{i + 1},{e + 1}"] == True:
+                            pos[i][0] = e + 1
+                        if e == 0 and result[f"px{i + 1},{e}"] == True:
+                            pos[i][0] = 0
+                    for f in range(height - 1):
+                        if result[f"py{i + 1},{f}"] == False and result[f"py{i + 1},{f + 1}"] == True:
+                            pos[i][1] = f + 1
+                        if f == 0 and result[f"py{i + 1},{f}"] == True:
+                            pos[i][1] = 0
+                return (["sat", pos, rotation])
+            else:
+                print("UNSAT")
+                return ("unsat")
+
+
 
 def SPP(lower, upper):
     global optimal_height, optimal_pos, optimal_rot
@@ -330,15 +300,14 @@ def SPP(lower, upper):
 results_data = []
 
 try:
-    instances_to_run = get_instances_from_c()
-
-    for instance_name in instances_to_run:
+    for instance in range(1, 39):
+        instance_name = instances[instance]
         try:
             print(f"\nProcessing instance {instance_name}")
             start = timeit.default_timer()
 
             # read file input
-            input = read_file_instance(instance_name)
+            input = read_file_instance(instance)
             width = int(input[0])
             n_rec = int(input[1])
             rectangles = [[int(val) for val in i.split()] for i in input[-n_rec:]]

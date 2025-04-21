@@ -16,23 +16,47 @@ start = timeit.default_timer() # start clock
 if not os.path.exists('SPP_INC_R_SB'):
     os.makedirs('SPP_INC_R_SB')
 
-def read_file_instance(instance_name):
-    """
-    Read file from c folder
-    instance_name: name of the instance (e.g., "C1P1")
-    """
+def read_file_instance(n_instance):
     s = ''
-    filepath = f"c/{instance_name}.txt"
+    filepath = "inputs/ins-{}.txt".format(n_instance)
     for line in fileinput.input(files=filepath):
         s += line
-    # Split lines and remove any empty strings
-    lines = [line.strip() for line in s.splitlines() if line.strip()]
-    print(f"Debug - Reading {instance_name}:")
-    print(f"Number of lines: {len(lines)}")
-    print(f"First line: {lines[0]}")
-    print(f"Second line: {lines[1]}")
-    print(f"Last line: {lines[-1]}")
-    return lines
+    return s.splitlines()
+
+instances= [ "",
+  "HT01(c1p1)", "HT02(c1p2)", "HT03(c1p3)", "HT04(c2p1)", "HT05(c2p2)", "HT06(c2p3)", 
+  "HT07(c3p1)", "HT08(c3p2)", "HT09(c3p3)", 
+  "CGCUT01", "CGCUT02", "CGCUT03", 
+  "GCUT01", "GCUT02", "GCUT03", "GCUT04", 
+  "NGCUT01", "NGCUT02", "NGCUT03", "NGCUT04", "NGCUT05", "NGCUT06", "NGCUT07", 
+  "NGCUT08", "NGCUT09", "NGCUT10", "NGCUT11", "NGCUT12", 
+  "BENG01", "BENG02", "BENG03", "BENG04", "BENG05", "BENG06", "BENG07", "BENG08", "BENG09", "BENG10"
+]
+
+def calculate_first_fit_upper_bound(width, rectangles):
+    # Sort rectangles by height (non-increasing)
+    sorted_rects = sorted(rectangles, key=lambda r: -r[1])
+    levels = []  # (y-position, remaining_width)
+    
+    for w, h in sorted_rects:
+        # Try to place on existing level
+        placed = False
+        for i in range(len(levels)):
+            if levels[i][1] >= w:
+                levels[i] = (levels[i][0], levels[i][1] - w)
+                placed = True
+                break
+        
+        # Create new level if needed
+        if not placed:
+            y_pos = 0 if not levels else max(level[0] + sorted_rects[i][1] for i, level in enumerate(levels))
+            levels.append((y_pos, width - w))
+    
+    # Calculate total height
+    if not levels:
+        return 0
+        
+    return max(level[0] + sorted_rects[levels.index(level)][1] for level in levels)
 
 def display_solution(strip, rectangles, pos_circuits, rotations, instance_name):
     fig, ax = plt.subplots()
@@ -190,9 +214,16 @@ def SPP_Incremental_Rotation(rectangles, strip_width, lower_bound, upper_bound, 
                           variables[f"py{j+1},{h}"], 
                           -variables[f"py{i+1},{h + j_height}"]])
     
-    # Add non-overlapping constraints for all pairs of rectangles
-    for i in range(n_rectangles):
-        for j in range(i + 1, n_rectangles):
+    max_width = max([int(rectangle[0]) for rectangle in rectangles])
+    second_max_width = max([int(rectangle[0]) for rectangle in rectangles if int(rectangle[0]) != max_width])
+
+    #Symmetry Breaking
+    for i in range(len(rectangles)):
+        for j in range(i + 1, len(rectangles)):
+            #Fix the position of the largest rectangle and the second largest rectangle
+            if rectangles[i][0] == max_width and rectangles[j][0] == second_max_width:
+                add_non_overlapping(False, i, j, False, False, True, True)
+                add_non_overlapping(True, i, j, False, False, True, True)
             # Large-rectangles horizontal
             if min(rectangles[i][0], rectangles[i][1]) + min(rectangles[j][0], rectangles[j][1]) > strip_width:
                 add_non_overlapping(False, i, j, False, False, True, True)
@@ -362,27 +393,6 @@ def SPP_Incremental_Rotation(rectangles, strip_width, lower_bound, upper_bound, 
         print(f"Final optimal height: {optimal_height}")
         return optimal_height, positions, rotations
 
-
-def get_instances_from_c(level=None, start_level=None, end_level=None, instance=None):
-    """
-    Get list of instances from c folder based on parameters
-    """
-    instances = []
-    if level is not None:
-        for p in range(1, 4):
-            instances.append(f"C{level}P{p}")
-    elif start_level is not None and end_level is not None:
-        for l in range(start_level, end_level + 1):
-            for p in range(1, 4):
-                instances.append(f"C{l}P{p}")
-    elif instance is not None:
-        instances.append(instance)
-    else:
-        for l in range(1, 8):
-            for p in range(1, 4):
-                instances.append(f"C{l}P{p}")
-    return instances
-
 def positive_range(end):
     if end < 0:
         return []
@@ -392,15 +402,14 @@ def positive_range(end):
 results_data = []
 
 try:
-    instances_to_run = get_instances_from_c(level=1)
-
-    for instance_name in instances_to_run:
+    for instance in range(1, 39):
+        instance_name = instances[instance]
         try:
             print(f"\nProcessing instance {instance_name}")
             start = timeit.default_timer()
 
             # read file input
-            input = read_file_instance(instance_name)
+            input = read_file_instance(instance)
             width = int(input[0])
             n_rec = int(input[1])
             print(f"Debug - Width: {width}, Number of rectangles: {n_rec}")
@@ -422,7 +431,7 @@ try:
             # Calculate initial bounds
             heights = [int(rectangle[1]) for rectangle in rectangles]
             area = math.floor(sum([int(rectangle[0] * rectangle[1]) for rectangle in rectangles]) / width)
-            upper_bound = sum(heights)
+            upper_bound = min(sum(heights), calculate_first_fit_upper_bound(width, rectangles))
             lower_bound = max(math.ceil(sum([int(rectangle[0] * rectangle[1]) for rectangle in rectangles]) / width), max(heights))
 
             print(f"Solving 2D Strip Packing with incremental SAT for instance {instance_name}")
